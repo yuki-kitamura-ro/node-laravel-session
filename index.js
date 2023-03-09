@@ -24,26 +24,34 @@ module.exports = {
     getSessionKey: function (laravelSession, laravelKey, keyLength) {
         keyLength = keyLength || 32;
         let cypher = 'aes-' + keyLength * 8 + '-cbc';
+        console.log(`cypher: ${cypher}`);
 
         //Get session object
-        laravelSession = new Buffer(laravelSession, 'base64');
+        laravelSession = Buffer.from(laravelSession, 'base64');
         laravelSession = laravelSession.toString();
+        // console.log(`laravelSession: ${laravelSession}`);
         laravelSession = JSON.parse(laravelSession);
 
         //Create key buffer
-        laravelKey = new Buffer(laravelKey, 'base64');
+        console.log(`laravelKey: ${laravelKey}`);
+        laravelKey = Buffer.from(laravelKey, 'base64');
+        // console.log(`laravelKey: ${laravelKey}`);
 
         //crypto required iv in binary or buffer
-        laravelSession.iv = new Buffer(laravelSession.iv, 'base64');
+        console.log(`laravelSession.iv: ${laravelSession.iv}`);
+        laravelSession.iv = Buffer.from(laravelSession.iv, 'base64');
+        // console.log(`laravelSession.iv: ${laravelSession.iv}`);
 
         //create decoder
         let decoder = crypto.createDecipheriv(cypher, laravelKey, laravelSession.iv);
 
         //add data to decoder and return decoded
-        let decoded = decoder.update(laravelSession.value, 'base64');
+        // console.log(`laravelSession.value: ${laravelSession.value}`);
+        let decoded = decoder.update(laravelSession.value, 'base64') + decoder.final();;
 
         //unserialize
-        return unserialize(decoded);
+        // console.log(`decoded: ${decoded}`);
+        return decoded.indexOf("s:") == 0 ? unserialize(decoded) : decoded;
     },
     getSessionFromFile: function (laravelSessionKey, filePath) {
         return new Promise(function (resolve, reject) {
@@ -54,14 +62,10 @@ module.exports = {
             });
         });
     },
-    getSessionFromRedis: function (laravelSessionKey, redisConnection, sessionPrefix='laravel_cache') {
-        return new Promise(function (resolve, reject) {
-            redisConnection.get(sessionPrefix + ':' + laravelSessionKey, function (err, value) {
-                if (err != null) return reject(err);
-
-                return resolve(unserialize2(unserialize2(value)));
-            });
-        });
+    getSessionFromRedis: async function (laravelSessionKey, redisConnection, sessionPrefix='laravel_cache') {
+        const value = await redisConnection.get(sessionPrefix + ':' + laravelSessionKey);
+        const first = unserialize2(value);
+        return first;
     },
     getSessionFromMysql: function (laravelSessionKey, mySqlConnection, databaseTable) {
         return new Promise(function (resolve, reject) {
